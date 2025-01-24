@@ -1,5 +1,7 @@
 metadata name = 'Local Network Gateways'
 metadata description = 'This module deploys a Local Network Gateway.'
+metadata version = '0.2.0'
+metadata forkedBy = 'Luis Ramos'
 
 @description('Required. Name of the Local Network Gateway.')
 @minLength(1)
@@ -8,20 +10,14 @@ param name string
 @description('Optional. Location for all resources.')
 param location string = resourceGroup().location
 
-@description('Required. List of the local (on-premises) IP address ranges.')
-param localAddressPrefixes array
+@description('Required. Local gateway address (Public IP or FQDN)')
+param localGatewayAddress string
 
-@description('Required. Public IP of the local gateway.')
-param localGatewayPublicIpAddress string
+@description('Required (if localBGPsettings not defined). List of the local (on-premises) IP address ranges.')
+param localAddressPrefixes array = []
 
-@description('Optional. The BGP speaker\'s ASN. Not providing this value will automatically disable BGP on this Local Network Gateway resource.')
-param localAsn string = ''
-
-@description('Optional. The BGP peering address and BGP identifier of this BGP speaker. Not providing this value will automatically disable BGP on this Local Network Gateway resource.')
-param localBgpPeeringAddress string = ''
-
-@description('Optional. The weight added to routes learned from this BGP speaker. This will only take effect if both the localAsn and the localBgpPeeringAddress values are provided.')
-param localPeerWeight string = ''
+@description('Required (if localAddressPrefixes not defined). Local device BGP parameters.')
+param localBgpSettings localBgpSettingsType
 
 @description('Optional. The lock settings of the service.')
 param lock lockType
@@ -35,14 +31,28 @@ param tags object?
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
 
-@description('Optional. FQDN of local network gateway.')
-param fqdn string = ''
+// Determine if it's an IP address (basic validation)
+// array with valid IP octet number range (0-255) 
+var allowedIpRange = [for i in range(0, 255): '${(i + 1)}']
+// split the IP address between the .
+var cidr = split(localGatewayAddress, '.')
+// check if all octets passed the IP address range
+var IpOctetValidation = [for IPoctet in cidr: contains(allowedIpRange,IPoctet)]
+// A valid IP has exactly 4 elements separated three dots and all passed the IP octet range
+var isIpAddress = length(cidr) == 4 && !contains(IpOctetValidation,false)
 
-var bgpSettings = {
-  asn: localAsn
-  bgpPeeringAddress: localBgpPeeringAddress
-  peerWeight: !empty(localPeerWeight) ? localPeerWeight : '0'
-}
+// Determine if it's an FQDN (basic validation)
+var isFqdn = length(cidr) > 1 && !isIpAddress
+
+var localGatewayPublicIpAddress = isIpAddress ? localGatewayAddress: null
+var fqdn = isFqdn ? localGatewayAddress : null
+
+/* for debug only - test if localGatewayAddress is an IP or FQDN 
+output IpOctetValidationResult array = IpOctetValidation
+output isIpResult bool = isIpAddress
+output IPaddressResult string = localGatewayPublicIpAddress == null? 'null': localGatewayPublicIpAddress
+output fqdnResult string = fqdn == null? 'null': fqdn
+*/
 
 var builtInRoleNames = {
   Contributor: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')
@@ -103,9 +113,9 @@ resource localNetworkGateway 'Microsoft.Network/localNetworkGateways@2023-04-01'
     localNetworkAddressSpace: {
       addressPrefixes: localAddressPrefixes
     }
-    fqdn: !empty(fqdn) ? fqdn : null
+    fqdn: fqdn
     gatewayIpAddress: localGatewayPublicIpAddress
-    bgpSettings: !empty(localAsn) && !empty(localBgpPeeringAddress) ? bgpSettings : null
+    bgpSettings: localBgpSettings
   }
 }
 
@@ -189,3 +199,14 @@ type roleAssignmentType = {
   @description('Optional. The Resource Id of the delegated managed identity resource.')
   delegatedManagedIdentityResourceId: string?
 }[]?
+
+type localBgpSettingsType = {
+  @minValue(1)
+  @maxValue(4294967295)
+  asn: int
+  @minLength(7)
+  @maxLength(15)
+  bgpPeeringAddress: string
+  @minValue(0)
+  peerWeight: int?
+}?
