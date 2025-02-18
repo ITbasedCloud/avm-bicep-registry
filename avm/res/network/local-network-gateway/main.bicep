@@ -1,5 +1,7 @@
 metadata name = 'Local Network Gateways'
 metadata description = 'This module deploys a Local Network Gateway.'
+metadata version = '0.2.0'
+metadata forkedBy = 'Luis Ramos'
 
 @description('Required. Name of the Local Network Gateway.')
 @minLength(1)
@@ -8,20 +10,21 @@ param name string
 @description('Optional. Location for all resources.')
 param location string = resourceGroup().location
 
-@description('Required. List of the local (on-premises) IP address ranges.')
-param localAddressPrefixes array
+@description('Required (if localBGPsettings not defined). List of the local (on-premises) IP address ranges.')
+param localAddressPrefixes array = []
 
-@description('Required. Public IP of the local gateway.')
-param localGatewayPublicIpAddress string
+@description('Required. Local gateway address type (IPaddress or FQDN)')
+@allowed([
+  'IPaddress'
+  'FQDN'
+])
+param localGatewayEndpoint string
 
-@description('Optional. The BGP speaker\'s ASN. Not providing this value will automatically disable BGP on this Local Network Gateway resource.')
-param localAsn string = ''
+@description('Required. Local gateway address (IPaddress or FQDN)')
+param localGatewayAddress string
 
-@description('Optional. The BGP peering address and BGP identifier of this BGP speaker. Not providing this value will automatically disable BGP on this Local Network Gateway resource.')
-param localBgpPeeringAddress string = ''
-
-@description('Optional. The weight added to routes learned from this BGP speaker. This will only take effect if both the localAsn and the localBgpPeeringAddress values are provided.')
-param localPeerWeight string = ''
+@description('Required (if localAddressPrefixes not defined). Local device BGP parameters.')
+param localBgpSettings localBgpSettingsType
 
 @description('Optional. The lock settings of the service.')
 param lock lockType
@@ -34,15 +37,6 @@ param tags object?
 
 @description('Optional. Enable/Disable usage telemetry for module.')
 param enableTelemetry bool = true
-
-@description('Optional. FQDN of local network gateway.')
-param fqdn string = ''
-
-var bgpSettings = {
-  asn: localAsn
-  bgpPeeringAddress: localBgpPeeringAddress
-  peerWeight: !empty(localPeerWeight) ? localPeerWeight : '0'
-}
 
 var builtInRoleNames = {
   Contributor: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')
@@ -103,9 +97,9 @@ resource localNetworkGateway 'Microsoft.Network/localNetworkGateways@2023-04-01'
     localNetworkAddressSpace: {
       addressPrefixes: localAddressPrefixes
     }
-    fqdn: !empty(fqdn) ? fqdn : null
-    gatewayIpAddress: localGatewayPublicIpAddress
-    bgpSettings: !empty(localAsn) && !empty(localBgpPeeringAddress) ? bgpSettings : null
+    fqdn: localGatewayEndpoint == 'FQDN' ? localGatewayAddress : null
+    gatewayIpAddress: localGatewayEndpoint == 'IPaddress' ? localGatewayAddress: null
+    bgpSettings: localBgpSettings
   }
 }
 
@@ -189,3 +183,17 @@ type roleAssignmentType = {
   @description('Optional. The Resource Id of the delegated managed identity resource.')
   delegatedManagedIdentityResourceId: string?
 }[]?
+
+type localBgpSettingsType = {
+  @description('The BGP speaker\'s ASN. Not providing this value will automatically disable BGP on this Local Network Gateway resource.')
+  @minValue(1)
+  @maxValue(4294967295)
+  asn: int
+  @description('The BGP peering address and BGP identifier of this BGP speaker. Not providing this value will automatically disable BGP on this Local Network Gateway resource.')
+  @minLength(7)
+  @maxLength(15)
+  bgpPeeringAddress: string
+  @description('Optional. The weight added to routes learned from this BGP speaker. This will only take effect if both the localAsn and the localBgpPeeringAddress values are provided.')
+  @minValue(0)
+  peerWeight: int?
+}?
