@@ -273,7 +273,7 @@ resource avmTelemetry 'Microsoft.Resources/deployments@2024-03-01' = if (enableT
 // ============
 // Create Public IP for the gateways instances that don't have and existing one assigned
 module publicIPAddresses 'br/public:avm/res/network/public-ip-address:0.8.0' = [for gateway in filter(vpnGatewayInstances, item => item.existingPip == 'false'): {
-  name: '${name}-${gateway.PipName}-${uniqueString(deployment().name, location)}'
+  name: '${deployment().name}-${gateway.PipName}-${uniqueString(deployment().name, location)}'
   params: {
     name: gateway.PipName
     diagnosticSettings: publicIpDiagnosticSettings

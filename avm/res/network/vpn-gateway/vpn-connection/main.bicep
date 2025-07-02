@@ -38,7 +38,7 @@ param enableBgp bool = false
 param routingWeight int = 0
 
 @description('Optional. Expected bandwidth in MBPS.')
-param connectionBandwidth int = 10
+param connectionBandwidth int?
 
 @description('Optional. Gateway connection protocol.')
 @allowed([

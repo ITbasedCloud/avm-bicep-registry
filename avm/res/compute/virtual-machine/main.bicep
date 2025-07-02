@@ -532,7 +532,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-07-01' = {
       vmSize: vmSize
     }
     securityProfile: {
-      encryptionAtHost: encryptionAtHost ? encryptionAtHost : null
+      //encryptionAtHost: encryptionAtHost ? encryptionAtHost : null
       securityType: securityType
       uefiSettings: securityType == 'TrustedLaunch'
         ? {
@@ -547,10 +547,10 @@ resource vm 'Microsoft.Compute/virtualMachines@2024-07-01' = {
         name: osDisk.?name ?? '${name}-disk-os-01'
         createOption: osDisk.?createOption ?? 'FromImage'
         deleteOption: osDisk.?deleteOption ?? 'Delete'
-        diskSizeGB: osDisk.diskSizeGB
+        diskSizeGB: osDisk.?diskSizeGB
         caching: osDisk.?caching ?? 'ReadOnly'
         managedDisk: {
-          storageAccountType: osDisk.managedDisk.storageAccountType
+          storageAccountType: osDisk.managedDisk.?storageAccountType
           diskEncryptionSet: {
             id: osDisk.managedDisk.?diskEncryptionSetResourceId
           }
